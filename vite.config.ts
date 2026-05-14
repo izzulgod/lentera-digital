@@ -1,16 +1,43 @@
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import tailwindcss from "@tailwindcss/vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import viteReact from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
+import { defineConfig, loadEnv } from "vite";
+import tsConfigPaths from "vite-tsconfig-paths";
 
-// Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-export default defineConfig({
-  cloudflare: false,
-  tanstackStart: {
-    server: { entry: "server" },
-  },
-  plugins: [
-    nitro({
-      preset: "vercel",
-      compatibilityDate: "2026-05-14",
+export default defineConfig(({ mode }) => {
+  const loadedEnv = loadEnv(mode, process.cwd(), "VITE_");
+
+  return {
+    define: Object.fromEntries(
+      Object.entries(loadedEnv).map(([key, value]) => [`import.meta.env.${key}`, JSON.stringify(value)]),
+    ),
+    resolve: {
+      alias: { "@": `${process.cwd()}/src` },
+      dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
+    },
+    server: { host: "::", port: 8080 },
+    plugins: [
+      tailwindcss(),
+      tsConfigPaths({ projects: ["./tsconfig.json"] }),
+      tanstackStart({
+        server: { entry: "server" },
+        importProtection: {
+          behavior: "error",
+          client: {
+            files: ["**/server/**"],
+            specifiers: ["server-only"],
+          },
+        },
+      }),
+      nitro({
+        preset: "vercel",
+        compatibilityDate: "2026-05-14",
+      }),
+      viteReact(),
+    ],
+  };
+});
     }),
   ],
 });
